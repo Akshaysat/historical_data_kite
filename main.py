@@ -6,7 +6,6 @@ import pandas as pd
 #Get input from user
 
 
-
 #Function to get last 60 days of data
 def get_data(period, start_date,end_date,symbol):
     #scrip_ID = mapping.get(symbol)
@@ -96,4 +95,4 @@ for i in stocks:
     df = scrap_data(i)
     df.insert(0,'Ticker',i)
     df = transform(df)
-    df.to_csv('historical_data_kite/data/' + i + '.csv')
+    df.to_csv('data/' + i + '.csv')
