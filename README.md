@@ -1,2 +1,2 @@
 # historical_data_kite
-Download the historical data from Zerodha Kite
+Download the historical data for free from Zerodha Kite.
