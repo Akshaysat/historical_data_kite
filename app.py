@@ -3,39 +3,46 @@ import requests
 import datetime as dt
 import pandas as pd
 import streamlit as st
+import base64
+import json
+import pickle
+import uuid
+import re
+import streamlit_analytics
 
 
 #Get input from user
 global user_id,token,timeframe, ticker
 
-# user_id = "VT5229"
-# token = "sP0cU2koF6AntNHSuFXXUfXZXku+iwzc9IuVtLsXDXarCdEHHk9P0s9piz7q+tyLMCrH4yWvzPrqhHeeEwIKrgg88/N6Og=="
-# timeframe = "minute"
+st.title("Stock Market Historical Data Downloader")
+
+user_id = st.text_input('Enter your Zerodha Kite ID:')
+token = st.text_input('Enter enctoken: ') #(watch video below to learn how to get your enctoken):
+segment = ['NSE','NFO']
+segment = st.selectbox('Select Segment',segment)
 
 #vlookup for instrument token
-instruments = pd.read_csv("https://api.kite.trade/instruments/NSE")
+try:
+    instruments = pd.read_csv("https://api.kite.trade/instruments/"+segment)
+except:
+    st.warning("Please Reload the page!")
+    st.stop()
+
 data = instruments[['instrument_token','tradingsymbol']]
 inst = data.set_index('tradingsymbol')
 stocks = data['tradingsymbol'].to_list()
 
+ticker = st.selectbox('Select the TickerSymbol',stocks)
 
-st.title("Historical Data -  Kite")
-
-user_id = st.text_input('Enter your Kite ID:')
-token = st.text_input('Enter enctoken:')
-#timeframe = st.selectbox('Enter the timeframe', ["minute","3minute","5minute","10minute","15minute","30minute","60minute"])
-ticker = st.multiselect('Enter the TickerSymbol',stocks)
 
 
 #Function to get last 60 days of data
 def get_data(period, start_date,end_date,symbol):
-    #scrip_ID = mapping.get(symbol)
-    #user_id = 'VT5229'
+
     scrip_ID = inst.loc[symbol]['instrument_token']
     url = f"https://kite.zerodha.com/oms/instruments/historical/{scrip_ID}/{period}?user_id={user_id}&oi=1&from={start_date}&to={end_date}"
     
-    #enctoken changes everytime you logoff
-    #token = "sP0cU2koF6AntNHSuFXXUfXZXku+iwzc9IuVtLsXDXarCdEHHk9P0s9piz7q+tyLMCrH4yWvzPrqhHeeEwIKrgg88/N6Og=="
+
     
     payload={}
     headers = {
@@ -105,27 +112,140 @@ def transform(df):
     
     return df
 
+def get_table_download_link(df):
+    """Generates a link allowing the data in a given panda dataframe to be downloaded
+    in:  dataframe
+    out: href string
+    """
+    csv = df.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()  # some strings <-> bytes conversions necessary here
+    return f'<a href="data:file/csv;base64,{b64}">Download csv file</a>'
+
+#download button
+def download_button(object_to_download, download_filename, button_text, pickle_it=False):
+    """
+    Generates a link to download the given object_to_download.
+
+    Params:
+    ------
+    object_to_download:  The object to be downloaded.
+    download_filename (str): filename and extension of file. e.g. mydata.csv,
+    some_txt_output.txt download_link_text (str): Text to display for download
+    link.
+    button_text (str): Text to display on download button (e.g. 'click here to download file')
+    pickle_it (bool): If True, pickle file.
+
+    Returns:
+    -------
+    (str): the anchor tag to download object_to_download
+
+    Examples:
+    --------
+    download_link(your_df, 'YOUR_DF.csv', 'Click to download data!')
+    download_link(your_str, 'YOUR_STRING.txt', 'Click to download text!')
+
+    """
+    if pickle_it:
+        try:
+            object_to_download = pickle.dumps(object_to_download)
+        except pickle.PicklingError as e:
+            st.write(e)
+            return None
+    
+    else:
+        if isinstance(object_to_download, bytes):
+            pass
+        
+        elif isinstance(object_to_download, pd.DataFrame):
+            object_to_download = object_to_download.to_csv(index=False)
+        
+        # Try JSON encode for everything else
+        else:
+            object_to_download = json.dumps(object_to_download)
+    
+    try:
+        # some strings <-> bytes conversions necessary here
+        b64 = base64.b64encode(object_to_download.encode()).decode()
+    
+    except AttributeError as e:
+        b64 = base64.b64encode(object_to_download).decode()
+    
+    button_uuid = str(uuid.uuid4()).replace('-', '')
+    button_id = re.sub('\d+', '', button_uuid)
+
+    prim_color = st.config.get_option('theme.primaryColor') or '#F43365'
+    bg_color = st.config.get_option('theme.backgroundColor') or '#808080'
+    sbg_color = st.config.get_option('theme.secondaryBackgroundColor') or '#f1f3f6'
+    txt_color = st.config.get_option('theme.textColor') or '#90EE90'		
+    font = st.config.get_option('theme.font') or 'sans serif'  
 
 
-#Create list of stocks/index/option/future symbol that you want the data for
-#stocks = ['INDIA VIX','SBIN']
+    custom_css = f"""
+        <style>
+            #{button_id} {{
+                background-color: {bg_color};
+                color: {txt_color};
+                padding: 0.25rem 0.75rem;
+                position: relative;
+                line-height: 1.6;
+                border-radius: 0.25rem;
+                border-width: 1px;
+                border-style: solid;
+                border-color: {bg_color};
+                border-image: initial;
+                filter: brightness(105%);
+                justify-content: center;
+                margin: 0px;
+                width: auto;
+                appearance: button;
+                display: inline-flex;
+                family-font: {font};
+                font-weight: 400;
+                letter-spacing: normal;
+                word-spacing: normal;
+                text-align: center;
+                text-rendering: auto;
+                text-transform: none;
+                text-indent: 0px;
+                text-shadow: none;
+                text-decoration: none;
+            }}
+            #{button_id}:hover {{
+                
+                border-color: {prim_color};
+                color: {prim_color};
+            }}
+            #{button_id}:active {{
+                box-shadow: none;
+                background-color: {prim_color};
+                color: {sbg_color};
+                }}
+        </style> """
+    
+    dl_link = custom_css + f'<a download="{download_filename}" class= "" id="{button_id}" ' \
+                           f'href="data:file/txt;base64,{b64}">{button_text}</a><br></br>'
+    
+    return dl_link
 
-# def get_table_download_link(df):
-#     """Generates a link allowing the data in a given panda dataframe to be downloaded
-#     in:  dataframe
-#     out: href string
-#     """
-#     csv = df.to_csv(index=False)
-#     b64 = base64.b64encode(csv.encode()).decode()  # some strings <-> bytes conversions necessary here
-#     return f'<a href="data:file/csv;base64,{b64}">Download csv file</a>'
 
-#For a list of tickers
+streamlit_analytics.start_tracking()
+if st.button("Generate download link"):
 
-if st.button("Download Data"):
-    for i in ticker:
-        df = scrap_data(str(i))
-        df.insert(0,'Ticker',i)
+    with st.spinner('Generating Download Link...'):
+        df = scrap_data(ticker)
+        #df.insert(0,'Ticker',ticker)
         df = transform(df)
-        df.to_csv('data/' + i + '.csv')
-        st.write("Downloaded data for " + i)
-        #st.markdown(get_table_download_link(df), unsafe_allow_html=True)
+        tmp_download_link = download_button(df, f'{ticker}.csv', button_text='Download Data for ' + ticker)
+        #tmp_download_link = download_button(df, f'{i}.txt', button_text='download data for ' + i)
+        #df.to_csv(i + ".txt", header=None, index=None, sep=',', mode='w')
+        df.to_csv(ticker + '.csv')
+    st.success("Download Link Generated!")
+    st.markdown(tmp_download_link, unsafe_allow_html=True)
+    st.balloons()
+    
+
+#st.header("How to use this tool?")
+#st.video('https://youtu.be/TFQEKQCYz_w') 
+
+streamlit_analytics.stop_tracking()
+
