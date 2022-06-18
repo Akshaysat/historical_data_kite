@@ -24,6 +24,7 @@ payload = {}
 headers= {}
 response = requests.request("GET", url, headers=headers, data = payload)
 token = response.text
+user_id = "VT5229"
 
 segment = ['NSE','NFO']
 segment = st.selectbox('Select Segment',segment)
