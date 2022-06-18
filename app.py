@@ -1,5 +1,6 @@
 import time 
 import requests
+import json
 import datetime as dt
 import pandas as pd
 import streamlit as st
@@ -16,8 +17,14 @@ global user_id,token,timeframe, ticker
 
 st.title("Stock Market Historical Data Downloader")
 
-user_id = st.text_input('Enter your Zerodha Kite ID:')
-token = st.text_input('Enter enctoken: ') #(watch video below to learn how to get your enctoken):
+#user_id = st.text_input('Enter your Zerodha Kite ID:')
+#token = st.text_input('Enter enctoken: ') #(watch video below to learn how to get your enctoken):
+url = "https://68o9pf66q0.execute-api.ap-south-1.amazonaws.com/"
+payload = {}
+headers= {}
+response = requests.request("GET", url, headers=headers, data = payload)
+token = response.text
+
 segment = ['NSE','NFO']
 segment = st.selectbox('Select Segment',segment)
 
